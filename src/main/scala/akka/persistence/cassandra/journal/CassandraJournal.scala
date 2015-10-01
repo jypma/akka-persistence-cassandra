@@ -1,6 +1,6 @@
 package akka.persistence.cassandra.journal
 
-import java.lang.{ Long => JLong }
+import java.lang.{ Long ⇒ JLong, Integer ⇒ JInt }
 import java.nio.ByteBuffer
 
 import com.datastax.driver.core.policies.{LoggingRetryPolicy, RetryPolicy}
@@ -16,9 +16,10 @@ import akka.persistence.journal.AsyncWriteJournal
 import akka.persistence._
 import akka.persistence.cassandra._
 import akka.serialization.SerializationExtension
-
 import com.datastax.driver.core._
 import com.datastax.driver.core.utils.Bytes
+import java.util.Calendar
+import java.util.Date
 
 class CassandraJournal extends AsyncWriteJournal with CassandraRecovery with CassandraStatements {
 
@@ -29,6 +30,7 @@ class CassandraJournal extends AsyncWriteJournal with CassandraRecovery with Cas
 
   val cluster = clusterBuilder.build
   val session = cluster.connect()
+  val timeWindow = new TimeWindow(config.timeWindowLength)
 
   case class MessageId(persistenceId: String, sequenceNr: Long)
 
@@ -40,6 +42,7 @@ class CassandraJournal extends AsyncWriteJournal with CassandraRecovery with Cas
   session.execute(createTable)
   session.execute(createMetatdataTable)
   session.execute(createConfigTable)
+  session.execute(createTimeIndexTable)
 
   val persistentConfig: Map[String, String] = session.execute(selectConfig).all().toList
     .map(row => (row.getString("property"), row.getString("value"))).toMap
@@ -57,6 +60,7 @@ class CassandraJournal extends AsyncWriteJournal with CassandraRecovery with Cas
   val preparedSelectHighestSequenceNr = session.prepare(selectHighestSequenceNr).setConsistencyLevel(readConsistency)
   val preparedSelectDeletedTo = session.prepare(selectDeletedTo).setConsistencyLevel(readConsistency)
   val preparedInsertDeletedTo = session.prepare(insertDeletedTo).setConsistencyLevel(writeConsistency)
+  val preparedWriteTimeIndex = session.prepare(writeMessageTimeIndex).setConsistencyLevel(writeConsistency)
 
   def asyncWriteMessages(messages: Seq[AtomicWrite]): Future[Seq[Try[Unit]]] = {
     // we need to preserve the order / size of this sequence even though we don't map
@@ -89,14 +93,24 @@ class CassandraJournal extends AsyncWriteJournal with CassandraRecovery with Cas
     val minPnr = partitionNr(firstSeq)
     val persistenceId: String = atomicWrites.head.persistenceId
     val all = atomicWrites.flatMap(_.payload)
+    val placement = timeWindow.place(persistenceId)
 
     // reading assumes sequence numbers are in the right partition or partition + 1
     // even if we did allow this it would perform terribly as large C* batches are not good
     require(maxPnr - minPnr <= 1, "Do not support AtomicWrites that span 3 partitions. Keep AtomicWrites <= max partition size.")
 
     val writes: Seq[BoundStatement] = all.map { m =>
-      preparedWriteMessage.bind(persistenceId, maxPnr: JLong, m.sequenceNr: JLong, m.serialized)
-    }
+      preparedWriteMessage.bind(persistenceId, maxPnr: JLong, m.sequenceNr: JLong, new Date(placement.windowStart), m.serialized)
+    } ++ (if (
+        config.indexedPersistenceIdPrefixes.exists(persistenceId.startsWith) &&
+        placement.isFirstOccurrenceInWindow) {
+      val cal = Calendar.getInstance
+      cal.setTimeInMillis(placement.windowStart)
+
+      val year_month_day = cal.get(Calendar.YEAR) * 10000 + cal.get(Calendar.MONTH) * 100 + cal.get(Calendar.DAY_OF_MONTH)
+      Seq(preparedWriteTimeIndex.bind(year_month_day: JInt, new Date(placement.windowStart), firstSeq: JLong, persistenceId, minPnr: JLong))
+    } else Seq.empty)
+
     // in case we skip an entire partition we want to make sure the empty partition has in in-use flag so scans
     // keep going when they encounter it
     if (partitionNew(firstSeq) && minPnr != maxPnr) writes :+ preparedWriteInUse.bind(persistenceId, minPnr: JLong)

@@ -56,7 +56,7 @@ class CassandraPluginConfig(config: Config) {
     val trustStorePW: String = config.getString("ssl.truststore.password")
     val keyStorePath: String = config.getString("ssl.keystore.path")
     val keyStorePW: String = config.getString("ssl.keystore.password")
-    
+
     val context = SSLSetup.constructContext(
       trustStorePath,
       trustStorePW,
