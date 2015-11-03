@@ -2,7 +2,7 @@ organization := "com.github.krasserm"
 
 name := "akka-persistence-cassandra"
 
-version := "0.5-jypma-201511021559"
+version := "0.5-jypma-201511031129"
 
 licenses += ("MIT", url("http://opensource.org/licenses/MIT"))
 
