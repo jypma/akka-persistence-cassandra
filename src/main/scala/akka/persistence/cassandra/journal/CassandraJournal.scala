@@ -100,16 +100,17 @@ class CassandraJournal extends AsyncWriteJournal with CassandraRecovery with Cas
       preparedWriteMessage.bind(persistenceId, maxPnr: JLong, m.sequenceNr: JLong, m.serialized)
     }
 
-    val indexWrites: Seq[BoundStatement] = all.collect {
-      case Serialized(_, _, event:Timestamped) =>
-        val placement = timeWindow.place(persistenceId, event)
-
-        val cal = Calendar.getInstance
-        cal.setTimeInMillis(placement.windowStart)
-        val year_month_day = cal.get(Calendar.YEAR) * 10000 + cal.get(Calendar.MONTH) * 100 + cal.get(Calendar.DAY_OF_MONTH)
-        preparedWriteTimeIndex.bind(year_month_day: JInt, new Date(placement.windowStart), firstSeq: JLong, persistenceId, minPnr: JLong)
+    val indexWrites: Seq[BoundStatement] = for {
+      Serialized(_, _, event:Timestamped) <- all
+      placement = timeWindow.place(persistenceId, event)
+      if placement.isFirstOccurrenceInWindow
+    } yield {
+      val cal = Calendar.getInstance
+      cal.setTimeInMillis(placement.windowStart)
+      val year_month_day = cal.get(Calendar.YEAR) * 10000 + cal.get(Calendar.MONTH) * 100 + cal.get(Calendar.DAY_OF_MONTH)
+      preparedWriteTimeIndex.bind(year_month_day: JInt, new Date(placement.windowStart), firstSeq: JLong, persistenceId, minPnr: JLong)      
     }
-
+    
     val writes = eventWrites ++ indexWrites
 
     // in case we skip an entire partition we want to make sure the empty partition has in in-use flag so scans
