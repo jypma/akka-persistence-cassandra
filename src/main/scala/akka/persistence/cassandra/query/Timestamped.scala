@@ -10,5 +10,5 @@ import java.time.Instant
  *   the actual time at which the event was emitted / created by the persistenceId)
  */
 trait Timestamped {
-  def timestamp: Instant
+  def getTimestamp: Long
 }

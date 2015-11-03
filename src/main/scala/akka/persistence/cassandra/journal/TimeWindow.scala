@@ -24,7 +24,7 @@ class TimeWindow(windowDurationMillis: Long) {
    * and whether it's the first seen event for that persistenceId in that time window
    */
   def place(persistenceId: String, event: Timestamped): Placement = {
-    val timestamp = event.timestamp.toEpochMilli
+    val timestamp = event.getTimestamp
     val window = timestamp / windowDurationMillis * windowDurationMillis
 
     val placement = windows.get(persistenceId) match {

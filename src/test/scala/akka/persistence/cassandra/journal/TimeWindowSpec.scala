@@ -8,7 +8,9 @@ import akka.persistence.cassandra.journal.TimeWindow.Placement
 
 class TimeWindowSpec extends WordSpec with Matchers {
 
-  case class Event(timestamp: Instant) extends Timestamped
+  case class Event(timestamp: Instant) extends Timestamped {
+    override def getTimestamp: Long = timestamp.toEpochMilli
+  }
 
   "A TimeWindow instance" must {
     "place events with similar timestamps into the same time window" in {
