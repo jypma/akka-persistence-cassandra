@@ -108,7 +108,8 @@ class CassandraJournal extends AsyncWriteJournal with CassandraRecovery with Cas
       val cal = Calendar.getInstance
       cal.setTimeInMillis(placement.windowStart)
       val year_month_day = cal.get(Calendar.YEAR) * 10000 + cal.get(Calendar.MONTH) * 100 + cal.get(Calendar.DAY_OF_MONTH)
-      preparedWriteTimeIndex.bind(year_month_day: JInt, new Date(placement.windowStart), firstSeq: JLong, persistenceId, minPnr: JLong)      
+      preparedWriteTimeIndex.bind(year_month_day: JInt, new Date(placement.windowStart), config.timeWindowLength.toMillis(): JLong, 
+                                  firstSeq: JLong, persistenceId, minPnr: JLong)      
     }
     
     val writes = eventWrites ++ indexWrites

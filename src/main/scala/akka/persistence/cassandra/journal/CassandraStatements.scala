@@ -28,6 +28,7 @@ trait CassandraStatements {
       CREATE TABLE IF NOT EXISTS ${timeIndexTableName} (
         year_month_day int,
         window_start timestamp,
+        window_length bigint,
         persistence_id text,
         first_sequence_nr_in_window bigint,
         partition_nr bigint,
@@ -49,8 +50,8 @@ trait CassandraStatements {
     """
 
   def writeMessageTimeIndex = s"""
-      INSERT INTO ${timeIndexTableName} (year_month_day, window_start, first_sequence_nr_in_window, persistence_id, partition_nr)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO ${timeIndexTableName} (year_month_day, window_start, window_length, first_sequence_nr_in_window, persistence_id, partition_nr)
+      VALUES (?, ?, ?, ?, ?, ?)
     """
 
   def deleteMessage = s"""

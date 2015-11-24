@@ -2,8 +2,8 @@ package akka.persistence.cassandra.journal
 
 import com.typesafe.config.Config
 import scala.collection.JavaConverters._
-
 import akka.persistence.cassandra.CassandraPluginConfig
+import java.time.Duration
 
 class CassandraJournalConfig(config: Config) extends CassandraPluginConfig(config) {
   val replayDispatcherId: String = config.getString("replay-dispatcher")
@@ -13,7 +13,7 @@ class CassandraJournalConfig(config: Config) extends CassandraPluginConfig(confi
   val maxMessageBatchSize = config.getInt("max-message-batch-size")
   val deleteRetries: Int = config.getInt("delete-retries")
   val timeIndexTable: String = config.getString("time-index-table")
-  val timeWindowLength: Long = config.getLong("time-window-length")
+  val timeWindowLength: Duration = config.getDuration("time-window-length")
 }
 
 object CassandraJournalConfig {
