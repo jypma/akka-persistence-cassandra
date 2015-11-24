@@ -18,11 +18,16 @@ import com.datastax.driver.core.utils.Bytes
 import java.util.Calendar
 import java.util.Date
 import akka.persistence.cassandra.query.Timestamped
+import akka.cluster.pubsub.DistributedPubSub
+import akka.cluster.pubsub.DistributedPubSubMediator.Publish
 
 class CassandraJournal extends AsyncWriteJournal with CassandraRecovery with CassandraStatements {
 
   val config = new CassandraJournalConfig(context.system.settings.config.getConfig("cassandra-journal"))
   val serialization = SerializationExtension(context.system)
+  
+  // if no clustering available, then just don't publish messages.
+  val pubsub = Try(DistributedPubSub(context.system).mediator).toOption 
 
   import config._
 
@@ -71,6 +76,16 @@ class CassandraJournal extends AsyncWriteJournal with CassandraRecovery with Cas
 
     val byPersistenceId = serialized.collect({ case Success(caw) => caw }).groupBy(_.persistenceId).values
     val boundStatements = byPersistenceId.map(statementGroup)
+    for (p <- pubsub) {
+      if (boundStatements.flatten.exists(_.preparedStatement eq preparedWriteTimeIndex)) {
+        p ! Publish("persistenceIndex", "added")
+      }
+      for (writes <- byPersistenceId) {
+        val pId = writes.head.persistenceId
+        val seqNr = writes.last.payload.last.sequenceNr
+        p ! Publish(s"persistenceId:$pId", s"added:$seqNr")
+      }
+    }
 
     val batchStatements = boundStatements.map({ unit =>
         executeBatch(batch => unit.foreach(batch.add))
