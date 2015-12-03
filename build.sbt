@@ -2,7 +2,7 @@ organization := "com.github.krasserm"
 
 name := "akka-persistence-cassandra"
 
-version := "0.5-jypma-201511031129"
+version := "0.5-jypma-201511241013"
 
 licenses += ("MIT", url("http://opensource.org/licenses/MIT"))
 
@@ -30,6 +30,7 @@ parallelExecution in Test := false
 libraryDependencies ++= Seq(
   "com.datastax.cassandra"  % "cassandra-driver-core"             % "2.1.5",
   "com.typesafe.akka"      %% "akka-persistence"                  % "2.4.0",
+  "com.typesafe.akka"      %% "akka-cluster-tools"                % "2.4.0",
   "com.typesafe.akka"      %% "akka-persistence-tck"              % "2.4.0"      % "test",
   "org.scalatest"          %% "scalatest"                         % "2.1.4"      % "test",
   "org.cassandraunit"       % "cassandra-unit"                    % "2.1.9.2"    % "test"

@@ -5,6 +5,7 @@ import TimeWindow._
 import akka.persistence.cassandra.query.Timestamped
 import scala.collection.immutable.SortedMap
 import java.time.Instant
+import java.time.Duration
 
 /**
  * Determines the time window to classify stored {@link Timestamped} events into.
@@ -12,9 +13,9 @@ import java.time.Instant
  * @param windowDurationMillis The duration of a time window. Events are only logged once per time
  * window per persistenceId.
  */
-class TimeWindow(windowDurationMillis: Long) {
+class TimeWindow(windowDuration: Duration) {
   // how long do we remember "old" events to see if new events arrive for the same time window
-  private val extendedTimeWindow = Math.min(windowDurationMillis * 4, 10000)
+  private val extendedTimeWindow = Math.min(windowDuration.toMillis() * 4, 10000)
 
   private var windows = Map.empty[String, Long]
   private var persistenceIds = SortedMap.empty[Long,Vector[String]]
@@ -25,7 +26,7 @@ class TimeWindow(windowDurationMillis: Long) {
    */
   def place(persistenceId: String, event: Timestamped): Placement = {
     val timestamp = event.getTimestamp
-    val window = timestamp / windowDurationMillis * windowDurationMillis
+    val window = timestamp / windowDuration.toMillis() * windowDuration.toMillis()
 
     val placement = windows.get(persistenceId) match {
       case Some(last) if last == window =>
